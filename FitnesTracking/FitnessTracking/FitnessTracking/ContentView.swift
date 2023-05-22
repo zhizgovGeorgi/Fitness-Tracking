@@ -67,9 +67,9 @@ struct Home : View{
                         Spacer()
                         
                         ZStack{
-                            ProgressBar(height: 300, to: 0.8, color: .red)
-                            ProgressBar(height: 230, to: CGFloat(CGFloat(vm.userStepCount.count)), color: .yellow)
-                            ProgressBar(height: 160, to: 0.3, color: Color("Color1"))
+                            ProgressBar(height: 300, to: 0.6 , color: .red)
+                            ProgressBar(height: 230, to: 0.4, color: .yellow)
+                            ProgressBar(height: 160, to: 0.2, color: Color("Color1"))
                             
                         }
                         
@@ -84,7 +84,7 @@ struct Home : View{
                                         .fontWeight(.bold)
                                         .foregroundColor(.red)
                                     
-                                    Text("\(vm.userStepCount)/1000")
+                                    Text("\(vm.userStepCount)/10000")
                                         .foregroundColor(.white)
                                     
                                 }
@@ -100,7 +100,7 @@ struct Home : View{
                                         .fontWeight(.bold)
                                         .foregroundColor(.yellow)
                                     
-                                    Text("800/1500")
+                                    Text("\(vm.userCalories)/2300")
                                         .foregroundColor(.white)
                                     
                                 }

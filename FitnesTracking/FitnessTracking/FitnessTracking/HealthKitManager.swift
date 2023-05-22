@@ -1,20 +1,15 @@
-//
-//  HealthKitManager.swift
-//  FitnessTracking
-//
-//  Created by Radolina on 04/05/2023.
-//
-
 import Foundation
 import HealthKit
 
 
 class HealthKitManager{
-    func setUpHealthRequest(healthStore: HKHealthStore, readSteps: @escaping () -> Void) {
-        if HKHealthStore.isHealthDataAvailable(), let stepCount = HKObjectType.quantityType(forIdentifier: HKQuantityTypeIdentifier.stepCount) , let calories = HKObjectType.quantityType(forIdentifier: HKQuantityTypeIdentifier.activeEnergyBurned) {
+    func setUpHealthRequest(healthStore: HKHealthStore, readValues: @escaping () -> Void) {
+        if HKHealthStore.isHealthDataAvailable(),
+            let stepCount = HKObjectType.quantityType(forIdentifier: HKQuantityTypeIdentifier.stepCount) ,
+            let calories = HKObjectType.quantityType(forIdentifier: HKQuantityTypeIdentifier.activeEnergyBurned) {
             healthStore.requestAuthorization(toShare: [stepCount, calories], read: [stepCount, calories]) { success, error in
                 if success {
-                    readSteps()
+                    readValues()
                 } else if error != nil {
                     // handle your error here
                 }
@@ -47,6 +42,29 @@ class HealthKitManager{
     }
     
     
+    func readCaloriesBurned(forDate date: Date, healthStore: HKHealthStore, completion: @escaping (Double) -> Void) {
+            guard let caloriesQuantityType = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned) else {
+                completion(0.0)
+                return
+            }
+            
+            let now = Date()
+            let startOfDay = Calendar.current.startOfDay(for: now)
+            let predicate = HKQuery.predicateForSamples(withStart: startOfDay, end: now, options: .strictStartDate)
+            
+            let query = HKStatisticsQuery(quantityType: caloriesQuantityType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
+                
+                guard let result = result, let sum = result.sumQuantity() else {
+                    completion(0.0)
+                    return
+                }
+                
+                completion(sum.doubleValue(for: HKUnit.kilocalorie()))
+            }
+            
+            healthStore.execute(query)
+        }
+    
 }
 
 class HealthKitViewModel : ObservableObject{
@@ -54,11 +72,14 @@ class HealthKitViewModel : ObservableObject{
     private var healthStore = HKHealthStore()
     private var healthKitManager = HealthKitManager()
     @Published var userStepCount = ""
+    @Published var userCalories = ""
     @Published var isAuthorized = false
+    @Published var isAuthorized2 = false
     func healthRequest() {
         healthKitManager.setUpHealthRequest(healthStore: healthStore) {
             self.changeAuthorizationStatus()
             self.readStepsTakenToday()
+            self.readCaloriesBurnedToday()
         }
     }
     
@@ -72,11 +93,39 @@ class HealthKitViewModel : ObservableObject{
         }
     }
     
-    func changeAuthorizationStatus() {
-        guard let stepQtyType = HKObjectType.quantityType(forIdentifier: .stepCount) else { return }
-        let status = self.healthStore.authorizationStatus(for: stepQtyType)
+    func readCaloriesBurnedToday() {
+            healthKitManager.readCaloriesBurned(forDate: Date(), healthStore: healthStore) { calories in
+                if calories != 0.0 {
+                    DispatchQueue.main.async {
+                        self.userCalories = String(format: "%.0f", calories)
+                    }
+                }
+            }
+        }
         
-        switch status {
+    
+    func changeAuthorizationStatus() {
+        
+        guard let stepQtyType = HKObjectType.quantityType(forIdentifier: .stepCount) else{return}
+                guard let caloriesQtyType = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)  else {return}
+        
+        let statusSteps = self.healthStore.authorizationStatus(for: stepQtyType)
+        let statusCal = self.healthStore.authorizationStatus(for: caloriesQtyType)
+        
+        switch statusSteps {
+        case .notDetermined:
+            isAuthorized = false
+        case .sharingDenied:
+            isAuthorized = false
+        case .sharingAuthorized:
+            DispatchQueue.main.async {
+                self.isAuthorized = true
+            }
+        @unknown default:
+            isAuthorized = false
+        }
+        
+        switch statusCal {
         case .notDetermined:
             isAuthorized = false
         case .sharingDenied:
@@ -92,13 +141,6 @@ class HealthKitViewModel : ObservableObject{
    
 }
 
-
-
-
-
-
-
-	
 
 
 
